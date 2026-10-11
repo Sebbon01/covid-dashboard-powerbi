@@ -1,0 +1,143 @@
+WIDOKI
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."CONTINENTCOMPARISON" ("CONTINENT", "LICZBA_KRAJOW", "TOTAL_CONFIRMED", "TOTAL_DEATHS", "TOTAL_RECOVERED", "TOTAL_ACTIVE", "TOTAL_POPULATION", "CASES_PER_MILLION", "DEATHS_PER_MILLION", "FATALITY_RATE", "RECOVERY_RATE") AS 
+  SELECT 
+    Continent,
+    COUNT(*) AS Liczba_Krajow,
+    SUM(TotalCases) AS Total_Confirmed,
+    SUM(TotalDeaths) AS Total_Deaths,
+    SUM(TotalRecovered) AS Total_Recovered,
+    SUM(ActiveCases) AS Total_Active,
+    SUM(Population) AS Total_Population,
+    ROUND(SUM(TotalCases) * 1000000 / NULLIF(SUM(Population), 0), 1) AS Cases_per_Million,
+    ROUND(SUM(TotalDeaths) * 1000000 / NULLIF(SUM(Population), 0), 1) AS Deaths_per_Million,
+    ROUND(SUM(TotalDeaths) * 100 / NULLIF(SUM(TotalCases), 0), 2) AS Fatality_Rate,
+    ROUND(SUM(TotalRecovered) * 100 / NULLIF(SUM(TotalCases), 0), 2) AS Recovery_Rate
+FROM ANONYMOUS.WORLD
+WHERE Continent IS NOT NULL
+  AND Population > 0
+GROUP BY Continent;
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."COUNTRYRANKING" ("COUNTRY_REGION", "CONFIRMED", "DEATHS", "RECOVERED", "ACTIVE", "POPULATION", "CASES_PER_MILLION", "DEATHS_PER_MILLION", "FATALITY_RATE", "RECOVERY_RATE", "WEEKPROCINCREASE", "WHOREGION", "CONTINENT") AS 
+  SELECT 
+    c.Country_Region,
+    c.Confirmed,
+    c.Deaths,
+    c.Recovered,
+    c.Active,
+    w.Population,
+    ROUND(c.Confirmed * 1000000 / NULLIF(w.Population, 0), 1) AS Cases_per_Million,
+    ROUND(c.Deaths * 1000000 / NULLIF(w.Population, 0), 1) AS Deaths_per_Million,
+    ROUND(c.Deaths * 100 / NULLIF(c.Confirmed, 0), 2) AS Fatality_Rate,
+    ROUND(c.Recovered * 100 / NULLIF(c.Confirmed, 0), 2) AS Recovery_Rate,
+    c.WeekProcincrease,
+    c.WHORegion,
+    w.Continent
+FROM ANONYMOUS.COUNTRY c
+LEFT JOIN ANONYMOUS.WORLD w 
+    ON LOWER(REPLACE(c.Country_Region, '*', '')) = LOWER(REPLACE(w.CountryRegion, '*', ''));
+
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."FASTESTGROWING" ("COUNTRY_REGION", "CONFIRMED", "ZMIANA_TYGODNIOWA", "PROCENTOWY_WZROST", "WHOREGION", "FATALITY_RATE") AS 
+  SELECT 
+    Country_Region,
+    Confirmed,
+    Weekchange AS Zmiana_Tygodniowa,
+    WeekProcincrease AS Procentowy_Wzrost,
+    WHORegion,
+    ROUND(Deaths * 100 / NULLIF(Confirmed, 0), 2) AS Fatality_Rate
+FROM ANONYMOUS.COUNTRY
+--WHERE WeekProcincrease > 0
+WHERE  TO_NUMBER(WeekProcincrease,'999999999999999999D99','NLS_NUMERIC_CHARACTERS=''.,''') > 0
+      AND Confirmed > 1000;
+
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."FATALITYRANKING" ("COUNTRY_REGION", "CONFIRMED", "DEATHS", "FATALITY_RATE", "RECOVERY_RATE", "WHOREGION") AS 
+  SELECT 
+    Country_Region,
+    Confirmed,
+    Deaths,
+    ROUND(Deaths * 100 / NULLIF(Confirmed, 0), 2) AS Fatality_Rate,
+    ROUND(Recovered * 100 / NULLIF(Confirmed, 0), 2) AS Recovery_Rate,
+    WHORegion
+FROM ANONYMOUS.COUNTRY
+WHERE Confirmed >= 5000;
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."GLOBALTREND" ("DATA", "CONFIRMED", "DEATHS", "RECOVERED", "ACTIVE", "NEWCASES", "NEWDEATHS", "NEWRECOVERED", "NEWCASES_7D_AVG", "NEWDEATHS_7D_AVG") AS 
+  SELECT 
+    Data,
+    Confirmed,
+    Deaths,
+    Recovered,
+    Active,
+    NewCases,
+    NewDeaths,
+    NewRecovered,
+    AVG(NewCases) OVER (ORDER BY Data ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS NewCases_7d_Avg,
+    AVG(NewDeaths) OVER (ORDER BY Data ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS NewDeaths_7d_Avg
+FROM ANONYMOUS.WISE;
+
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."TESTINGEFFICIENCY" ("COUNTRYREGION", "TOTALCASES", "TOTALTESTS", "TESTS_PER_CASE", "TOTCASES1MPOP", "TESTS1MPOP", "FATALITY_RATE", "WHOREGION", "CONTINENT") AS 
+  SELECT 
+    CountryRegion,
+    TotalCases,
+    TotalTests,
+    ROUND(TotalTests / NULLIF(TotalCases, 0), 1) AS Tests_per_Case,
+    TotCases1Mpop,
+    Tests1Mpop,
+    ROUND(TotalDeaths * 100 / NULLIF(TotalCases, 0), 2) AS Fatality_Rate,
+    WHORegion,
+    Continent
+FROM ANONYMOUS.WORLD
+WHERE TotalTests > 10000;
+
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."VW_TOPCOUNTRIES_DAILY" ("DATA", "COUNTRYREGION", "CONFIRMED", "DEATHS", "RECOVERED", "ACTIVE", "NEWCASES", "NEWDEATHS", "WHOREGION") AS 
+  SELECT 
+    Data,
+    CountryRegion,
+    Confirmed,
+    Deaths,
+    Recovered,
+    Active,
+    NewCases,
+    NewDeaths,
+    WHORegion
+FROM ANONYMOUS.GROUPED
+WHERE CountryRegion IN (
+    'US', 'India', 'Brazil', 'Russia', 'South Africa',
+    'Mexico', 'Peru', 'Chile', 'Colombia', 'Poland',
+    'United Kingdom', 'Italy', 'Spain', 'Germany', 'France',
+    'Iran', 'Turkey', 'Saudi Arabia', 'Pakistan', 'Bangladesh'
+);
+
+
+
+
+  CREATE OR REPLACE FORCE NONEDITIONABLE VIEW "ANONYMOUS"."WHOREGIONS" ("CONTINET", "LICZBA_KRAJOW", "TOTAL_CONFIRMED", "TOTAL_DEATHS", "TOTAL_RECOVERED", "TOTAL_ACTIVE", "FATALITY_RATE") AS 
+  SELECT 
+    WHOREGION AS CONTINET,
+    COUNT(*) AS Liczba_Krajow,
+    SUM(Confirmed) AS Total_Confirmed,
+    SUM(Deaths) AS Total_Deaths,
+    SUM(Recovered) AS Total_Recovered,
+    SUM(Active) AS Total_Active,
+    ROUND(SUM(Deaths) * 100 / NULLIF(SUM(Confirmed), 0), 2) AS Fatality_Rate
+FROM ANONYMOUS.COUNTRY
+GROUP BY WHORegion;
+
+
+
